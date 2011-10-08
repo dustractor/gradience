@@ -1,0 +1,13 @@
+gradience.py -- version 0.1
+=========================================================================
+Adds into the material properties panel, at the bottom, checkboxes three.
+
+One each for diffuse_ramp,specular_ramp,and the texture color ramp.
+
+So far, only rgb and roygbiv, but easy to add more.
+
+    At present, this code is only two days old, so not really any features,
+such as one might wish to import for example .grd files or at least have
+basic load/save/new functionality.  Nope.  None of that.  ( Yet? )
+
+OLL KORRECT!

@@ -2,150 +2,217 @@ bl_info = {
 "name" : "Gradience",
 "author" : "dustractor",
 "version" : (0, 1),
-"blender" : (2, 5, 9),
-"api" : 39355,
+"blender" : (2, 6, 9),
+"api" : 61000,
 "location" : "Material",
-"description" : "Adds simple functionality for gradient presets (colorbands).",
+"description" : "Generate sequence of colors and apply to ramp or selected object materials.",
 "warning" : "",
 "wiki_url" : "",
 "tracker_url" : "",
 "category" : "Material"
 }
-
 import bpy
 from mathutils import Color
+from math import modf,sin
+import random
+from itertools import cycle
 
 
-class gradient:
-    name=None
-    label=None
-    desc=None
-    data=None#tuple(or list) of tuples of 4 floatsorints
+
+def update_gradience(self,context):
+    wheel = context.scene.gradience
+    hf,hm,ho,sf,sm,so,vf,vm,vo = wheel.hue_mod_freq, wheel.hue_mod_magn, wheel.hue_mod_offs, wheel.sat_mod_freq, wheel.sat_mod_magn, wheel.sat_mod_offs, wheel.val_mod_freq, wheel.val_mod_magn, wheel.val_mod_offs
+    gl = wheel.global_offset
+    tot = len(wheel.colors)
+    per = 1.0 / tot
+    hue,sat,val = wheel.base_color.hsv
+    for n in range(tot):
+        i = gl +(per * n)
+        hue += sin((i*hf) + ho) * hm
+        sat += sin((i*sf) + so) * sm
+        val += sin((i*vf) + vo) * vm
+        wheel.colors[n].color.hsv = (modf(hue)[0],modf(sat)[0],modf(val)[0])
 
 
-t={}
-
-def gradien(f):
-    global t
-    x=type("GRDT_"+f.__name__, (gradient,),
-        {"name": f.__name__, "label": f.__doc__, "desc": f.__doc__,
-        "data": f })
-    t[f.__name__]=x
-    return f
-
-@gradien
-def rgb():
-    '''red-green-blue'''
-    return (
-        (1,0,0,1),
-        (0,1,0,1),
-        (0,0,1,1)
-    )
-
-@gradien
-def roygbiv():
-    '''R O Y G B I V'''
-    c=Color()
-    C=()
-    for i in range(7):
-        c.hsv = (i*(1.0/7.0),1.0,1.0)
-        C+=((c.r,c.g,c.b,1.0),)
-    return C
-
-@gradien
-def roygbiv2():
-    '''double R O Y G B I V'''
-    c=Color()
-    C=()
-    for i in range(14):
-        c.hsv = (i*(1.0/14.0),1.0,1.0)
-        C+=((c.r,c.g,c.b,1.0),)
-    return C
-
-def apply_(what,what2):
-    L=len(what)
-    eL=len(what2)
-    for j in reversed(range(1,eL)):
-        what2.remove(what2[j])
-    what2[0].position=0.0
-    what2[0].color=what[0]
-    for j in range(1,L):
-        n=what2.new(j*(1/(L-1)))
-        n.color=what[j]
-    n.position=1.0
-
-def texcol_(self,context):
-    global t
-    apply_(t[context.scene.gradience.whicht].data(),context.material.active_texture.color_ramp.elements)
-
-def diff_(self,context):
-    global t
-    apply_(t[context.scene.gradience.whichd].data(),context.material.diffuse_ramp.elements)
-
-def spec_(self,context):
-    global t
-    apply_(t[context.scene.gradience.whichs].data(),context.material.specular_ramp.elements)
-
-def gradients_lister(cls,context):
-    global t
-    return [(a.name,a.label,a.desc) for a in t.values()]
-
-def tog_dif(self,context):
-    if context.scene.gradience.indif:
-        bpy.types.MATERIAL_PT_diffuse.prepend(ddisp)
-    else:
-        bpy.types.MATERIAL_PT_diffuse.remove(ddisp)
-        
-def tog_spec(self,context):
-    if context.scene.gradience.inspec:
-        bpy.types.MATERIAL_PT_specular.prepend(sdisp)
-    else:
-        bpy.types.MATERIAL_PT_specular.remove(sdisp)
-def tog_tex(self,context):
-    if context.scene.gradience.intex:
-        bpy.types.TEXTURE_PT_colors.prepend(tdisp)
-    else:
-        bpy.types.TEXTURE_PT_colors.remove(tdisp)
-
-def tdisp(self,context):
-    self.layout.prop(context.scene.gradience,"whicht")
-
-def ddisp(self,context):
-    self.layout.prop(context.scene.gradience,"whichd")
-
-def sdisp(self,context):
-    self.layout.prop(context.scene.gradience,"whichs")
+class colour(bpy.types.PropertyGroup):
+    rgba = property(fget=lambda s:tuple(s.color)+(1.0,))
+    color = bpy.props.FloatVectorProperty(min=0.0,max=1.0,subtype="COLOR")
 
 
-class gradience(bpy.types.PropertyGroup):   
-    indif=bpy.props.BoolProperty(name="diffuse",update=tog_dif)
-    inspec=bpy.props.BoolProperty(name="specular",update=tog_spec)
-    intex=bpy.props.BoolProperty(name="texture",update=tog_tex)
-    whichd=bpy.props.EnumProperty(name="Gradient",items=gradients_lister,update=diff_)
-    whichs=bpy.props.EnumProperty(name="Gradient",items=gradients_lister,update=spec_)
-    whicht=bpy.props.EnumProperty(name="Gradient",items=gradients_lister,update=texcol_)
+class ChromatonicProp(bpy.types.PropertyGroup):
+    display = bpy.props.BoolProperty()
+    show_params = bpy.props.BoolProperty()
+    base_color = bpy.props.FloatVectorProperty(default=(0.0,0.0,0.0),min=0.0,max=1.0,precision=7,subtype="COLOR",update=update_gradience)
+    colors = bpy.props.CollectionProperty(type=colour)
+    hue_mod_freq = bpy.props.FloatProperty(update=update_gradience,default=1.0,subtype='UNSIGNED')
+    hue_mod_magn = bpy.props.FloatProperty(update=update_gradience,default=1.0,subtype='UNSIGNED')
+    hue_mod_offs = bpy.props.FloatProperty(update=update_gradience,default=0.0,subtype='UNSIGNED')
+    sat_mod_freq = bpy.props.FloatProperty(update=update_gradience,default=0.0,subtype='UNSIGNED')
+    sat_mod_magn = bpy.props.FloatProperty(update=update_gradience,default=1.0,subtype='UNSIGNED')
+    sat_mod_offs = bpy.props.FloatProperty(update=update_gradience,default=1.5,subtype='UNSIGNED')
+    val_mod_freq = bpy.props.FloatProperty(update=update_gradience,default=0.0,subtype='UNSIGNED')
+    val_mod_magn = bpy.props.FloatProperty(update=update_gradience,default=1.0,subtype='UNSIGNED')
+    val_mod_offs = bpy.props.FloatProperty(update=update_gradience,default=1.5,subtype='UNSIGNED')
+    global_offset = bpy.props.FloatProperty(update=update_gradience,default=0.0,subtype='UNSIGNED')
 
 
-class GradientPropertiesPanel(bpy.types.Panel):
-    bl_label="Gradient Presets"
-    bl_space_type="PROPERTIES"
-    bl_region_type="WINDOW"
-    bl_context="material"
+class GRADIENCE_OT_add(bpy.types.Operator):
+    bl_idname = "gradience.add"
+    bl_label = "add gradience slot"
+    def execute(self,context):
+        wheel = context.scene.gradience.colors
+        wheel.add()
+        update_gradience(None,context)
+        return {"FINISHED"}
+
+
+class GRADIENCE_OT_del(bpy.types.Operator):
+    bl_idname = "gradience.del"
+    bl_label = "delete gradience slot"
+    n = bpy.props.IntProperty()
+    def execute(self,context):
+        context.scene.gradience.colors.remove(self.n)
+        return {"FINISHED"}
+    
+
+class GRADIENCE_OT_assign(bpy.types.Operator):
+    bl_idname = "gradience.assign"
+    bl_label = "assign  gradience to selected"
+    n = bpy.props.IntProperty(min=-1,default=-1)
+    single_ize = bpy.props.BoolProperty()
+    vcols = bpy.props.BoolProperty()
+    def invoke(self,context,event):
+        self.single_ize = event.shift
+        self.vcols = event.alt
+        return self.execute(context)
+    def execute(self,context):
+        wheel = context.scene.gradience
+        if self.single_ize:
+            bpy.ops.object.make_single_user(type='SELECTED_OBJECTS', material=True)
+        colorx = cycle([each.color for each in wheel.colors])
+        get_color = colorx.__next__
+        if self.vcols:
+            ob = context.object
+            me = ob.data
+            vcols = me.vertex_colors.active.data
+            for vx in vcols:
+                c = get_color()
+                vx.color = (c[0],c[1],c[2])
+        else:
+            selected_objects = [ob for ob in bpy.data.objects if ob.select and ob.type in {'LAMP','MESH','CURVE'}]
+            for ob in selected_objects:
+                if ob.type in {'CURVE','MESH'}:
+                        if not len(ob.data.materials):
+                            mat = bpy.data.materials.new('cw_mat')
+                            ob.data.materials.append(mat)
+                        else:
+                            mat = ob.data.materials[0]
+                        mat.diffuse_color = get_color()
+                elif ob.type == 'LAMP':
+                    ob.data.color = get_color()
+        return {"FINISHED"}
+
+
+class GRADIENCE_OT_gradience_to_ramp(bpy.types.Operator):
+    bl_label = "Ramp"
+    bl_idname = "gradience.to_ramp"
+    constant = bpy.props.BoolProperty()
+    def invoke(self,context,event):
+        self.constant = event.shift or event.alt or event.oskey or event.ctrl
+        return self.execute(context)
+    def execute(self,context):
+        colors = context.scene.gradience.colors
+        cl = len(colors)
+        if not len(colors):
+            return {"CANCELLED"}
+        r = None
+        mat = context.active_object.data.materials[0]
+        mat.use_diffuse_ramp = True
+        r = mat.diffuse_ramp
+        if self.constant:
+            r.interpolation = "CONSTANT"
+        ramp = r.elements
+        while len(ramp) > 1:
+            ramp.remove(ramp[-1])
+        ramp[0].position = 0.0
+        ramp[0].color = colors[0].rgba
+        inc = 1.0 / (cl-1)
+        for j in range(1,cl):
+            n=ramp.new(j*inc)
+            n.color=colors[j].rgba
+        return {"FINISHED"}
+
+
+class GRADIENCE_OT_randomize(bpy.types.Operator):
+    bl_idname = "gradience.randomize"
+    bl_label = "randomize"
+    def execute(self,context):
+        wheel = context.scene.gradience
+        for att in ("hue_mod_freq","hue_mod_magn","hue_mod_offs","sat_mod_freq","sat_mod_magn","sat_mod_offs","val_mod_freq","val_mod_magn","val_mod_offs"):
+            setattr(wheel,att,random.random())
+        return {"FINISHED"}
+
+def gradience_controls(layout,wheel):
+    row = layout.row(align=True)
+    row.operator('gradience.assign',icon='FORWARD',text='')
+    row.operator("gradience.to_ramp")
+    row.prop(wheel,"show_params",toggle=True,icon=["DISCLOSURE_TRI_RIGHT_VEC","DISCLOSURE_TRI_DOWN_VEC"][wheel.show_params])
+    if wheel.show_params:
+        row = layout.row(align=True)
+        row.prop(wheel,'base_color')
+        split = layout.split()
+        d,a,b,c = split.column(align=True),split.column(align=True),split.column(align=True),split.column(align=True)
+        d.label('Mod')
+        d.label('Freq')
+        d.label('Mag')
+        d.label('Off')
+        a.label('Hue')
+        a.prop(wheel,'hue_mod_freq',text='')
+        a.prop(wheel,'hue_mod_magn',text='')
+        a.prop(wheel,'hue_mod_offs',text='')
+        b.label('Saturation')
+        b.prop(wheel,'sat_mod_freq',text='')
+        b.prop(wheel,'sat_mod_magn',text='')
+        b.prop(wheel,'sat_mod_offs',text='')
+        c.label('Value')
+        c.prop(wheel,'val_mod_freq',text='')
+        c.prop(wheel,'val_mod_magn',text='')
+        c.prop(wheel,'val_mod_offs',text='')
+        layout.prop(wheel,'global_offset')
+    layout.operator("gradience.randomize")
+
+def gradience_display(layout,wheel):
+    for n,color in enumerate(wheel.colors):
+        row = layout.row(align=True)
+        row.prop(color,'color',text='')
+        row.operator('gradience.del',icon='X',text='',emboss=False).n = n
+
+def gradience_tools(layout,wheel):
+    row = layout.row()
+
+class GRADIENCE_PT_gradience(bpy.types.Panel):
+    bl_label = "Chromatone"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    def draw_header(self,context):
+        self.layout.operator("gradience.add",text=str(len(context.scene.gradience.colors)),icon="ZOOMIN")
     def draw(self,context):
-        self.layout.prop(context.scene.gradience,"indif")
-        self.layout.prop(context.scene.gradience,"inspec")
-        self.layout.prop(context.scene.gradience,"intex")
+        layout = self.layout
+        wheel = context.scene.gradience
+        gradience_controls(layout,wheel)
+        gradience_display(layout,wheel)
 
 
 def register():
-    bpy.utils.register_class(gradience)
-    bpy.types.Scene.gradience=bpy.props.PointerProperty(type=gradience)
-    bpy.utils.register_class(GradientPropertiesPanel)
+    bpy.utils.register_module(__name__)
+    bpy.types.Scene.gradience = bpy.props.PointerProperty(type=ChromatonicProp)
 
 def unregister():
-    bpy.utils.unregister_class(GradientPropertiesPanel)
-    bpy.utils.unregister_class(gradience)
     del bpy.types.Scene.gradience
+    bpy.utils.unregister_module(__name__)
 
 if __name__ == "__main__":
     register()
+
+
+

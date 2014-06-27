@@ -38,7 +38,7 @@ from itertools import cycle
 
 
 def update_gradience(self,context):
-    wheel = context.scene.gradience
+    wheel = context.active_object.gradience
     hf,hm,ho,sf,sm,so,vf,vm,vo = wheel.hue_mod_freq, wheel.hue_mod_magn, wheel.hue_mod_offs, wheel.sat_mod_freq, wheel.sat_mod_magn, wheel.sat_mod_offs, wheel.val_mod_freq, wheel.val_mod_magn, wheel.val_mod_offs
     gl = wheel.global_offset
     tot = len(wheel.colors)
@@ -78,7 +78,7 @@ class GRADIENCE_OT_add(bpy.types.Operator):
     bl_idname = "gradience.add"
     bl_label = "add gradience slot"
     def execute(self,context):
-        wheel = context.scene.gradience.colors
+        wheel = context.active_object.gradience.colors
         wheel.add()
         update_gradience(None,context)
         return {"FINISHED"}
@@ -89,7 +89,7 @@ class GRADIENCE_OT_del(bpy.types.Operator):
     bl_label = "delete gradience slot"
     n = bpy.props.IntProperty()
     def execute(self,context):
-        context.scene.gradience.colors.remove(self.n)
+        context.active_object.gradience.colors.remove(self.n)
         return {"FINISHED"}
     
 
@@ -104,7 +104,7 @@ class GRADIENCE_OT_assign(bpy.types.Operator):
         self.vcols = event.alt
         return self.execute(context)
     def execute(self,context):
-        wheel = context.scene.gradience
+        wheel = context.active_object.gradience
         if self.single_ize:
             bpy.ops.object.make_single_user(type='SELECTED_OBJECTS', material=True)
         colorx = cycle([each.color for each in wheel.colors])
@@ -139,7 +139,7 @@ class GRADIENCE_OT_gradience_to_ramp(bpy.types.Operator):
         self.constant = event.shift or event.alt or event.oskey or event.ctrl
         return self.execute(context)
     def execute(self,context):
-        colors = context.scene.gradience.colors
+        colors = context.active_object.gradience.colors
         cl = len(colors)
         if not len(colors):
             return {"CANCELLED"}
@@ -165,7 +165,7 @@ class GRADIENCE_OT_randomize(bpy.types.Operator):
     bl_idname = "gradience.randomize"
     bl_label = "randomize"
     def execute(self,context):
-        wheel = context.scene.gradience
+        wheel = context.active_object.gradience
         for att in ("hue_mod_freq","hue_mod_magn","hue_mod_offs","sat_mod_freq","sat_mod_magn","sat_mod_offs","val_mod_freq","val_mod_magn","val_mod_offs"):
             setattr(wheel,att,random.random())
         return {"FINISHED"}
@@ -213,20 +213,20 @@ class GRADIENCE_PT_gradience(bpy.types.Panel):
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     def draw_header(self,context):
-        self.layout.operator("gradience.add",text=str(len(context.scene.gradience.colors)),icon="ZOOMIN")
+        self.layout.operator("gradience.add",text=str(len(context.active_object.gradience.colors)),icon="ZOOMIN")
     def draw(self,context):
         layout = self.layout
-        wheel = context.scene.gradience
+        wheel = context.active_object.gradience
         gradience_controls(layout,wheel)
         gradience_display(layout,wheel)
 
 
 def register():
     bpy.utils.register_module(__name__)
-    bpy.types.Scene.gradience = bpy.props.PointerProperty(type=ChromatonicProp)
+    bpy.types.Object.gradience = bpy.props.PointerProperty(type=ChromatonicProp)
 
 def unregister():
-    del bpy.types.Scene.gradience
+    del bpy.types.Object.gradience
     bpy.utils.unregister_module(__name__)
 
 if __name__ == "__main__":

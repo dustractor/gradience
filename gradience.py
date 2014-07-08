@@ -38,6 +38,8 @@ from itertools import cycle
 
 
 def update_gradience(self,context):
+    if not context.active_object:
+        return
     wheel = context.active_object.gradience
     hf,hm,ho,sf,sm,so,vf,vm,vo = wheel.hue_mod_freq, wheel.hue_mod_magn, wheel.hue_mod_offs, wheel.sat_mod_freq, wheel.sat_mod_magn, wheel.sat_mod_offs, wheel.val_mod_freq, wheel.val_mod_magn, wheel.val_mod_offs
     gl = wheel.global_offset

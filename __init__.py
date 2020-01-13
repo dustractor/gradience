@@ -19,26 +19,31 @@
 bl_info = {
 "name" : "Gradience",
 "author" : "dustractor@gmail.com",
-"version" : (0,10000),
-"blender" : (2, 6, 9),
-"api" : 61000,
+"version" : (1,0),
+"blender" : (2, 80, 0),
 "location" : "Gradience Tab",
-"description" : "Generates sequences of colors.",
+"description" : "Generates sequences of colors in colorramp nodes.",
 "warning" : "",
 "wiki_url" : "",
 "tracker_url" : "",
-"category" : "Material"
+"category" : "Node Editor"
 }
 
-from math import modf,sin
 import random
-from itertools import cycle
-
 import bpy
+
+from math import modf,sin
+from itertools import cycle
 from bl_operators.presets import AddPresetBase
 from mathutils import Color
 
-# import selection_utils
+def _(f=None,r=[]):
+    if not f:
+        return r
+    r.append(f)
+    return f
+
+
 
 _k = (
         "g_offs",
@@ -76,9 +81,7 @@ def gradience_iter(g,n):
 
 
 def update_gradience(self,context):
-    if not context.active_object:
-        return
-    gradience = context.active_object.gradience
+    gradience = context.screen.gradience
     total = len(gradience.colors)
     for n,k in enumerate(gradience_iter(gradience,total)):
         gradience.colors[n].color.hsv = k
@@ -86,26 +89,26 @@ def update_gradience(self,context):
 
 def gradience_controls(layout,gradience):
     row = layout.row(align=True)
-    row.operator("gradience.assign",icon="FORWARD").mode = "MATERIALS"
-    row.operator("gradience.assign",icon="FORWARD").mode = "MATERIALS_UNIQUE"
-    row.operator("gradience.assign",icon="FORWARD").mode = "VERTEX_COLORS"
+    # row.operator("gradience.assign",icon="FORWARD").mode = "MATERIALS"
+    # row.operator("gradience.assign",icon="FORWARD").mode = "MATERIALS_UNIQUE"
+    # row.operator("gradience.assign",icon="FORWARD").mode = "VERTEX_COLORS"
     row.operator("gradience.to_ramp")
     box = layout.box()
     row = box.row(align=True)
     row.menu("GRADIENCE_MT_preset_menu")
-    row.operator("gradience.add_preset",text="",icon="ZOOMIN")
-    row.operator("gradience.add_preset",text="",icon="ZOOMOUT").remove_active=True
+    row.operator("gradience.add_preset",text="",icon="ADD")
+    row.operator("gradience.add_preset",text="",icon="REMOVE").remove_active=True
     row = box.row(align=True)
     row.label(icon="BLANK1")
-    row.label("Hue")
-    row.label("Saturation")
-    row.label("Value")
+    row.label(text="Hue")
+    row.label(text="Saturation")
+    row.label(text="Value")
     row = box.row(align=True)
-    split = row.split(percentage=0.12)
+    split = row.split(factor=0.12)
     col = split.column(align=True)
-    col.label("Freq")
-    col.label("Magn")
-    col.label("Offs")
+    col.label(text="Freq")
+    col.label(text="Magn")
+    col.label(text="Offs")
     col = split.column(align=True)
     row = col.row(align=True)
     row.prop(gradience,"hue_freq",text="")
@@ -124,7 +127,7 @@ def gradience_controls(layout,gradience):
 
 def gradience_display(layout,gradience):
     layout.operator("gradience.add",
-            text="Colors: %d" % len(gradience.colors),icon="ZOOMIN")
+            text="Colors: %d" % len(gradience.colors),icon="ADD")
     box = layout.box()
     col = box.column(align=True)
     for n,color in enumerate(gradience.colors):
@@ -132,96 +135,41 @@ def gradience_display(layout,gradience):
         row.scale_y = 0.8
         row.prop(color,"color",text="")
         row.operator("gradience.del",icon="X",text="",emboss=False).n = n
-    layout.operator("gradience.to_palette")
-
-def palette_display(layout,palette):
-    box = layout.box()
-    col = box.column(align=True)
-    for color in palette.colors:
-        row = col.row(align=True)
-        row.prop(color,"color",text="")
-    box = layout.box()
-    row = box.row(align=True)
-    row.menu("GRADIENCE_MT_palette_preset_menu")
-    row.operator("gradience.add_palette_preset",
-            text="",icon="ZOOMIN")
-    row.operator("gradience.add_palette_preset",
-            text="",icon="ZOOMOUT").remove_active=True
 
 
-class colour(bpy.types.PropertyGroup):
-    rgba = property(fget=lambda s:tuple(s.color)+(1.0,))
-    color = bpy.props.FloatVectorProperty(min=0.0,max=1.0,subtype="COLOR")
 
-
-class PaletteProperty(bpy.types.PropertyGroup):
-    colors = bpy.props.CollectionProperty(type=colour)
-
-
-class GradienceProperty(bpy.types.PropertyGroup):
-    display = bpy.props.BoolProperty()
-    base_color = bpy.props.FloatVectorProperty(
-            default=(0.0,0.0,0.0),
-            min=0.0,max=1.0,
-            precision=7,subtype="COLOR",update=update_gradience)
-    colors = bpy.props.CollectionProperty(type=colour)
-    defaultd = dict(update=update_gradience,subtype="UNSIGNED",precision=7)
-    hue_freq = bpy.props.FloatProperty(default=1.0,**defaultd)
-    hue_magn = bpy.props.FloatProperty(default=1.0,**defaultd)
-    hue_offs = bpy.props.FloatProperty(default=0.0,**defaultd)
-    sat_freq = bpy.props.FloatProperty(default=0.0,**defaultd)
-    sat_magn = bpy.props.FloatProperty(default=1.0,**defaultd)
-    sat_offs = bpy.props.FloatProperty(default=1.5,**defaultd)
-    val_freq = bpy.props.FloatProperty(default=0.0,**defaultd)
-    val_magn = bpy.props.FloatProperty(default=1.0,**defaultd)
-    val_offs = bpy.props.FloatProperty(default=1.5,**defaultd)
-    g_offs = bpy.props.FloatProperty(default=0.0,**defaultd)
-
-
-class GRADIENCE_OT_to_palette(bpy.types.Operator):
-    bl_idname = "gradience.to_palette"
-    bl_label = "gradience to palette"
-    def execute(self,context):
-        gradience = context.active_object.gradience
-        palette = context.active_object.palette
-        while len(palette.colors) > len(gradience.colors):
-            palette.colors.remove(palette.colors[-1])
-        while len(palette.colors) < len(gradience.colors):
-            palette.colors.add()
-        for g,p in zip(gradience.colors,palette.colors):
-            p.color = g.color
-        return {"FINISHED"}
-
-
+@_
 class GRADIENCE_OT_add(bpy.types.Operator):
     bl_idname = "gradience.add"
     bl_label = "add gradience slot"
     def execute(self,context):
-        gradience = context.active_object.gradience
+        gradience = context.screen.gradience
         gradience.colors.add()
         update_gradience(None,context)
         return {"FINISHED"}
 
 
+@_
 class GRADIENCE_OT_del(bpy.types.Operator):
     bl_idname = "gradience.del"
     bl_label = "delete gradience slot"
-    n = bpy.props.IntProperty()
+    n: bpy.props.IntProperty()
     def execute(self,context):
-        context.active_object.gradience.colors.remove(self.n)
+        context.screen.gradience.colors.remove(self.n)
         return {"FINISHED"}
 
 
+@_
 class GRADIENCE_OT_assign(bpy.types.Operator):
     bl_idname = "gradience.assign"
     bl_label = "assign  gradience to selected"
     bl_options = {"REGISTER","UNDO","INTERNAL"}
-    mode = bpy.props.EnumProperty(
+    mode: bpy.props.EnumProperty(
             items=[(_,)*3 for _ in (
                 "MATERIALS","MATERIALS_UNIQUE","VERTEX_COLORS")],
             default="MATERIALS")
     def execute(self,context):
-        gradience = context.active_object.gradience
+        gradience = context.screen.gradience
         colorx = cycle([each.color for each in gradience.colors])
         get_color = colorx.__next__
 
@@ -231,15 +179,14 @@ class GRADIENCE_OT_assign(bpy.types.Operator):
             me = ob.data
             vcols = me.vertex_colors.active.data
             for vx in vcols:
-                c = get_color()
-                vx.color = (c[0],c[1],c[2])
+                vx.color = [*get_color()]+[1.0]
         else:
             if self.mode == "MATERIALS_UNIQUE":
                 bpy.ops.object.make_single_user(
                         type="SELECTED_OBJECTS", material=True)
             selected_objects = [
-                    ob for ob in bpy.data.objects
-                    if ob.select and ob.type in {"LAMP","MESH","CURVE"}]
+                    ob for ob in context.view_layer.objects.selected
+                    if ob.select_get and ob.type in {"LIGHT","MESH","CURVE"}]
             for ob in selected_objects:
                 if ob.type in {"CURVE","MESH"}:
                         if not len(ob.data.materials):
@@ -247,30 +194,22 @@ class GRADIENCE_OT_assign(bpy.types.Operator):
                             ob.data.materials.append(mat)
                         else:
                             mat = ob.data.materials[0]
-                        mat.diffuse_color = get_color()
+                        mat.diffuse_color = [*get_color()] + [1.0]
                 elif ob.type == "LAMP":
                     ob.data.color = get_color()
         return {"FINISHED"}
 
 
+@_
 class GRADIENCE_OT_gradience_to_ramp(bpy.types.Operator):
     bl_label = "Ramp"
     bl_idname = "gradience.to_ramp"
-    constant = bpy.props.BoolProperty()
-    def invoke(self,context,event):
-        self.constant = event.shift or event.alt or event.oskey or event.ctrl
-        return self.execute(context)
     def execute(self,context):
-        colors = context.active_object.gradience.colors
+        colors = context.screen.gradience.colors
         colorcount = len(colors)
         if not colorcount:
             return {"CANCELLED"}
-        r = None
-        mat = context.active_object.data.materials[0]
-        mat.use_diffuse_ramp = True
-        r = mat.diffuse_ramp
-        if self.constant:
-            r.interpolation = "CONSTANT"
+        r = context.active_node.color_ramp
         ramp = r.elements
         while len(ramp) > 1:
             ramp.remove(ramp[-1])
@@ -283,24 +222,50 @@ class GRADIENCE_OT_gradience_to_ramp(bpy.types.Operator):
         return {"FINISHED"}
 
 
+@_
 class GRADIENCE_OT_randomize(bpy.types.Operator):
     bl_idname = "gradience.randomize"
     bl_label = "randomize"
     def execute(self,context):
-        gradience = context.active_object.gradience
+        gradience = context.screen.gradience
         for att in _k:
             setattr(gradience,att,random.random())
         return {"FINISHED"}
 
 
-class GRADIENCE_MT_palette_preset_menu(bpy.types.Menu):
-    bl_label = "Gradience Palettes"
-    bl_idname= "GRADIENCE_MT_palette_preset_menu"
-    preset_subdir = "gradience_palettes"
-    preset_operator = "script.execute_preset"
-    draw = bpy.types.Menu.draw_preset
+@_
+class colour(bpy.types.PropertyGroup):
+    rgba = property(fget=lambda s:tuple(s.color)+(1.0,))
+    color: bpy.props.FloatVectorProperty(min=0.0,max=1.0,subtype="COLOR")
 
 
+@_
+class PaletteProperty(bpy.types.PropertyGroup):
+    colors: bpy.props.CollectionProperty(type=colour)
+
+
+@_
+class GradienceProperty(bpy.types.PropertyGroup):
+    display: bpy.props.BoolProperty()
+    base_color: bpy.props.FloatVectorProperty(
+            default=(0.0,0.0,0.0),
+            min=0.0,max=1.0,
+            precision=7,subtype="COLOR",update=update_gradience)
+    colors: bpy.props.CollectionProperty(type=colour)
+    defaultd = dict(update=update_gradience,subtype="UNSIGNED",precision=7)
+    hue_freq: bpy.props.FloatProperty(default=1.0,**defaultd)
+    hue_magn: bpy.props.FloatProperty(default=1.0,**defaultd)
+    hue_offs: bpy.props.FloatProperty(default=0.0,**defaultd)
+    sat_freq: bpy.props.FloatProperty(default=0.0,**defaultd)
+    sat_magn: bpy.props.FloatProperty(default=1.0,**defaultd)
+    sat_offs: bpy.props.FloatProperty(default=1.5,**defaultd)
+    val_freq: bpy.props.FloatProperty(default=0.0,**defaultd)
+    val_magn: bpy.props.FloatProperty(default=1.0,**defaultd)
+    val_offs: bpy.props.FloatProperty(default=1.5,**defaultd)
+    g_offs: bpy.props.FloatProperty(default=0.0,**defaultd)
+
+
+@_
 class GRADIENCE_MT_preset_menu(bpy.types.Menu):
     bl_label = "Gradience Presets"
     bl_idname= "GRADIENCE_MT_preset_menu"
@@ -308,53 +273,54 @@ class GRADIENCE_MT_preset_menu(bpy.types.Menu):
     preset_operator = "script.execute_preset"
     draw = bpy.types.Menu.draw_preset
 
-
+@_
 class GRADIENCE_OT_palette_preset_add(AddPresetBase,bpy.types.Operator):
     bl_idname = "gradience.add_palette_preset"
     bl_label = "add palette preset"
     preset_menu = "GRADIENCE_MT_palette_preset_menu"
     preset_subdir = "gradience_palettes"
-    preset_defines = [ "palette = bpy.context.active_object.palette" ]
+    preset_defines = [ "palette = bpy.context.screen.palette" ]
     preset_values = ["palette.colors"]
 
 
+@_
 class GRADIENCE_OT_preset_add(AddPresetBase,bpy.types.Operator):
     bl_idname = "gradience.add_preset"
     bl_label = "add preset"
     preset_menu = "GRADIENCE_MT_preset_menu"
     preset_subdir = "gradience"
-    preset_defines = [ "gradience = bpy.context.active_object.gradience" ]
+    preset_defines = [ "gradience = bpy.context.screen.gradience" ]
     preset_values = ["gradience.colors"] + ["gradience.%s" % _ for _ in _k]
 
 
+@_
 class GRADIENCE_PT_gradience(bpy.types.Panel):
     bl_label = "Gradience"
-    bl_space_type = "VIEW_3D"
-    bl_region_type = "TOOLS"
-    bl_category = "Gradience"
+    bl_space_type = "NODE_EDITOR"
+    bl_region_type = "UI"
+    bl_category = "Item"
     bl_options = {"HIDE_HEADER"}
+    @classmethod
+    def poll(self,context):
+        return context.active_node and context.active_node.type == "VALTORGB"
     def draw_header(self,context):
         row = self.layout.row(align=True)
         row.label(icon="COLOR")
     def draw(self,context):
         layout = self.layout
         layout.separator()
-        gradience = context.active_object.gradience
-        palette = context.active_object.palette
+        gradience = context.screen.gradience
         gradience_controls(layout,gradience)
         gradience_display(layout,gradience)
-        palette_display(layout,palette)
 
 
 def register():
-    bpy.utils.register_module(__name__)
-    bpy.types.Object.gradience = bpy.props.PointerProperty(type=GradienceProperty)
-    bpy.types.Object.palette = bpy.props.PointerProperty(type=PaletteProperty)
+    list(map(bpy.utils.register_class,_()))
+    bpy.types.Screen.gradience = bpy.props.PointerProperty(type=GradienceProperty)
 
 def unregister():
-    del bpy.types.Object.gradience
-    del bpy.types.Object.palette
-    bpy.utils.unregister_module(__name__)
+    del bpy.types.Screen.gradience
+    list(map(bpy.utils.unregister_class,_()))
 
 if __name__ == "__main__":
     register()

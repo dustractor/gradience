@@ -1,13 +1,10 @@
-gradience.py -- version 0.1
+gradience.py -- version 1.1
 =========================================================================
-Adds into the material properties panel, at the bottom, checkboxes three.
 
-One each for diffuse_ramp,specular_ramp,and the texture color ramp.
+Visible in node editor sidebar under 'Item' category when a color ramp node is selected.
 
-So far, only rgb and roygbiv, but easy to add more.
+Add color stops using 'add' button.  Use 'X' buttons on color stops to remove them.
 
-    At present, this code is only two days old, so not really any features,
-such as one might wish to import for example .grd files or at least have
-basic load/save/new functionality.  Nope.  None of that.  ( Yet? )
+Adjust parameters or use randomize button.
 
-OLL KORRECT!
+Use 'ramp' button to send to the node.
